@@ -7,7 +7,7 @@ from MainNNModel import ResNet34
 from MainNNModel import ResNet50
 from MainNNModel import ResNet101
 
-image_val_path = ''  
+image_val_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/test'  
 
 val_transform = transforms.Compose([
     transforms.Resize(256),
@@ -20,7 +20,7 @@ val_dataset = datasets.ImageFolder(image_val_path, transform=val_transform)
 val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=8, pin_memory=True)
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model = ResNet50(num_classes=1000).to(device)
+model = ResNet50().to(device)
 model.load_state_dict(torch.load('best_resnet50.pth', map_location=device))
 model.eval()
 

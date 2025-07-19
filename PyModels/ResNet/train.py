@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+from tqdm import tqdm
 
 from MainNNModel import ResNet18
 from MainNNModel import ResNet34
@@ -12,8 +13,8 @@ from MainNNModel import ResNet101
 
 import os
 
-image_train_path = ''
-image_val_path = ''
+image_train_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/train'
+image_val_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/val'
 
 
 
@@ -22,7 +23,7 @@ train_transform = transforms.Compose(
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0,406], std = [0.229, 0.224, 0,225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
     ]
 )
 
@@ -31,18 +32,18 @@ val_transform = transforms.Compose(
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0,406], std = [0.229, 0.224, 0,225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
     ]
 )
 
 train_dataset = datasets.ImageFolder(image_train_path, transform = train_transform)
 val_dataset = datasets.ImageFolder(image_val_path, transform = val_transform)
 
-train_loader = DataLoader(train_dataset, batch_size = 128, shuffle = True, num_workers= 8, pin_memory= True)
-val_loader = DataLoader(val_dataset, batch_size = 128, shuffle = False, num_workers = 8, pin_memory = True)
+train_loader = DataLoader(train_dataset, batch_size = 8, shuffle = True, num_workers= 2, pin_memory= True)
+val_loader = DataLoader(val_dataset, batch_size = 8, shuffle = False, num_workers = 2, pin_memory = True)
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model = ResNet50(num_classes = 1000).to(device)
+model = ResNet50().to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.AdamW(model.parameters(), lr = 0.001, weight_decay= 1e-4)
@@ -53,7 +54,7 @@ def train(epoch):
     running_loss = 0.0
     correct = 0
     total = 0
-    for batch_index, (inputs, targets) in enumerate(train_loader):
+    for batch_index, (inputs, targets) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch}")):
         input_device = inputs.to(device)
         target_device = targets.to(device)
 
@@ -104,7 +105,7 @@ def main(num_epoch):
         
         if  acc> best_acc:
             best_acc = acc
-            torch.save(model.state_dict(), 'best_resnet50.pth')
+            torch.save(model.state_dict(), 'ResNet/best_resnet50.pth')
             print('Best model saved!')
 
 
