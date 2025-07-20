@@ -1,5 +1,6 @@
 # This component is for ResNet ONLY!
 import torch
+from torch.cuda import is_available
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -12,6 +13,10 @@ from MainNNModel import ResNet50
 from MainNNModel import ResNet101
 
 import os
+
+output_dir = os.path.join(os.path.dirname(__file__), 'output')
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 image_train_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/train'
 image_val_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/val'
@@ -39,10 +44,20 @@ val_transform = transforms.Compose(
 train_dataset = datasets.ImageFolder(image_train_path, transform = train_transform)
 val_dataset = datasets.ImageFolder(image_val_path, transform = val_transform)
 
-train_loader = DataLoader(train_dataset, batch_size = 8, shuffle = True, num_workers= 2, pin_memory= True)
-val_loader = DataLoader(val_dataset, batch_size = 8, shuffle = False, num_workers = 2, pin_memory = True)
+train_loader = DataLoader(train_dataset, batch_size = 16, shuffle = True, num_workers= 8, pin_memory= True)
+val_loader = DataLoader(val_dataset, batch_size = 16, shuffle = False, num_workers = 8, pin_memory = True)
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+
+
 model = ResNet50().to(device)
 
 criterion = nn.CrossEntropyLoss()
@@ -103,13 +118,14 @@ def main(num_epoch):
         train(epoch)
         acc = validate()
         
-        if  acc> best_acc:
+        if  acc > best_acc:
             best_acc = acc
-            torch.save(model.state_dict(), 'ResNet/best_resnet50.pth')
-            print('Best model saved!')
+            pth_path = os.path.join(output_dir, f'best_resnet50_epoch{epoch}.pth')
+            torch.save(model.state_dict(), pth_path)
+            print(f'Best model saved at {pth_path}!')
 
 
 if __name__ == '__main__':
-    epoch = 100
+    epoch = 30
     main(epoch)
 

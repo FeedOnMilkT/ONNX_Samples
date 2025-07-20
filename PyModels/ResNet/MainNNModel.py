@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 class BasicBlock(nn.Module):
     expansion = 1
     def __init__(self, in_channels, channels, stride = 1):
@@ -96,7 +97,7 @@ class Bottleneck(nn.Module):
     
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes = 10):
+    def __init__(self, block, layers, num_classes = 200):
         super(ResNet, self).__init__()
         # print("Using block:", block)
         self.in_channels = 64
