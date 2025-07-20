@@ -1,7 +1,7 @@
 import os
 import shutil
 
-val_dir = 'val'
+val_dir = '/root/tiny-imagenet-200/val'
 img_dir = os.path.join(val_dir, 'images')
 ann_file = os.path.join(val_dir, 'val_annotations.txt')
 

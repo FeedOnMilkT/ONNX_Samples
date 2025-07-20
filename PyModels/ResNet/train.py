@@ -13,13 +13,16 @@ from MainNNModel import ResNet50
 from MainNNModel import ResNet101
 
 import os
+import argparse
+
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 output_dir = os.path.join(os.path.dirname(__file__), 'output')
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-image_train_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/train'
-image_val_path = '/Users/wangsiwei/C++Code/ONNX_Samples/dataset/tiny-imagenet-200/val'
+image_train_path = '/root/tiny-imagenet-200/train'
+image_val_path = '/root/tiny-imagenet-200/val'
 
 
 
@@ -44,8 +47,8 @@ val_transform = transforms.Compose(
 train_dataset = datasets.ImageFolder(image_train_path, transform = train_transform)
 val_dataset = datasets.ImageFolder(image_val_path, transform = val_transform)
 
-train_loader = DataLoader(train_dataset, batch_size = 16, shuffle = True, num_workers= 8, pin_memory= True)
-val_loader = DataLoader(val_dataset, batch_size = 16, shuffle = False, num_workers = 8, pin_memory = True)
+train_loader = DataLoader(train_dataset, batch_size = 256, shuffle = True, num_workers= 32, pin_memory= True)
+val_loader = DataLoader(val_dataset, batch_size = 256, shuffle = False, num_workers = 32, pin_memory = True)
 
 #device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -63,6 +66,22 @@ model = ResNet50().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.AdamW(model.parameters(), lr = 0.001, weight_decay= 1e-4)
 # No scheduler for AdamW optimizer
+
+def load_checkpoint(model, optimizer, checkpoint_path):
+    checkpoint = torch.load(checkpoint_path)
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint.get('epoch', 0)
+        best_acc = checkpoint.get('best_acc', 0)
+    else:
+        # 兼容旧格式
+        model.load_state_dict(checkpoint)
+        start_epoch = 0
+        best_acc = 0
+        print("Loaded old-style checkpoint (only model weights). Optimizer state and epoch not restored.")
+    print(f"Loaded checkpoint from {checkpoint_path}, epoch {start_epoch}, best_acc {best_acc}")
+    return start_epoch, best_acc
 
 def train(epoch):
     model.train()
@@ -112,20 +131,37 @@ def validate():
 
     return acc
 
-def main(num_epoch):
+def main(num_epoch, resume=None):
     best_acc = 0
-    for epoch in range(num_epoch):
+    start_epoch = 0
+    if resume is not None:
+        if os.path.isfile(resume):
+            start_epoch, best_acc = load_checkpoint(model, optimizer, resume)
+        else:
+            print(f"No checkpoint found at {resume}, training from scratch.")
+
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=5, verbose=True)
+
+    for epoch in range(start_epoch, num_epoch):
         train(epoch)
         acc = validate()
-        
+        scheduler.step(acc)
         if  acc > best_acc:
             best_acc = acc
             pth_path = os.path.join(output_dir, f'best_resnet50_epoch{epoch}.pth')
-            torch.save(model.state_dict(), pth_path)
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_acc': best_acc
+            }, pth_path)
             print(f'Best model saved at {pth_path}!')
 
 
 if __name__ == '__main__':
-    epoch = 30
-    main(epoch)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train')
+    parser.add_argument('--resume', type=str, default=None, help='Path to checkpoint to resume from')
+    args = parser.parse_args()
+    main(args.epochs, resume=args.resume)
 
